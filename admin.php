@@ -79,6 +79,7 @@ if (isset($_GET['lecture'])) {
     $lec = q1('SELECT l.*, c.name AS course_name FROM lecture l JOIN course c ON c.id = l.course_id WHERE l.id = ?', [(int)$_GET['lecture']]);
     if (!$lec) redirect('admin.php');
     $att = q('SELECT a.*, s.name, s.neptun FROM attendance a JOIN student s ON s.id = a.student_id WHERE a.lecture_id = ? ORDER BY a.checked_at', [$lec['id']])->fetchAll();
+    $ipCount = array_count_values(array_filter(array_column($att, 'ip')));
     $absent = q('SELECT s.id, s.name, s.neptun, COUNT(*) AS n FROM student s
                  JOIN attendance a ON a.student_id = s.id JOIN lecture l ON l.id = a.lecture_id
                  WHERE l.course_id = ? AND s.id NOT IN (SELECT student_id FROM attendance WHERE lecture_id = ?)
@@ -99,7 +100,7 @@ if (isset($_GET['lecture'])) {
       <section class="card">
         <h2>Jelen voltak</h2>
         <table class="tbl">
-          <thead><tr><th>Idő</th><th>Név</th><th>Neptun</th><th></th></tr></thead>
+          <thead><tr><th>Idő</th><th>Név</th><th>Neptun</th><th>IP</th><th></th></tr></thead>
           <tbody>
           <?php foreach ($att as $r): ?>
             <tr>
@@ -108,10 +109,11 @@ if (isset($_GET['lecture'])) {
                 <?php if ($r['name_given'] && normalize_name($r['name_given']) !== $r['name']): ?><span class="muted small" title="Beíráskor megadott név">„<?= h($r['name_given']) ?>”</span><?php endif; ?>
                 <?php if ($r['source'] === 'manual'): ?><span class="chip">kézi</span><?php endif; ?></td>
               <td class="mono"><?= h($r['neptun']) ?></td>
+              <td class="mono small"><?php if ($r['ip'] !== ''): ?><?= h($r['ip']) ?><?php if ($ipCount[$r['ip']] > 1): ?> <span class="chip" title="Ugyanerről az IP-címről ennyi bejelentkezés jött ezen az órán">×<?= (int)$ipCount[$r['ip']] ?></span><?php endif; ?><?php else: ?><span class="muted">–</span><?php endif; ?></td>
               <td class="r"><form method="post" onsubmit="return confirm('Törlöd ezt a jelenlétet?')"><?= csrf_field() ?><input type="hidden" name="a" value="del_att"><input type="hidden" name="att" value="<?= (int)$r['id'] ?>"><button class="icon-btn" title="Törlés">✕</button></form></td>
             </tr>
           <?php endforeach; ?>
-          <?php if (!$att): ?><tr><td colspan="4" class="muted">Még senki.</td></tr><?php endif; ?>
+          <?php if (!$att): ?><tr><td colspan="5" class="muted">Még senki.</td></tr><?php endif; ?>
           </tbody>
         </table>
         <form method="post" class="row-form top-gap">
