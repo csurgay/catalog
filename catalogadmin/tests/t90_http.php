@@ -60,6 +60,8 @@ test($G, 'Belépve az oktatói oldalak hibátlanul betöltenek', function () use
         no_php_errors($r['body'], $p);
         contains($mark, $r['body'], $p);
     }
+    $r = http_get(base_url() . 'stats.php', $ADM());
+    check(strpos($r['body'], 'href="migrate.php"') === false, 'a menüben / oldalon még van link a migrációra');
     $r = http_get(base_url() . 'api.php', $ADM());
     same(200, $r['code'], 'api.php');
     $j = json_decode($r['body'], true);

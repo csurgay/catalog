@@ -15,7 +15,7 @@ catalogadmin/   oktatói oldalak (PIN-nel védve), a ../catalog kódját haszná
 | `catalogadmin/stats.php` | Dashboard + kereshető, szűrhető, rendezhető hallgatólista, CSV export |
 | `catalogadmin/student.php` | Egy hallgató idővonala, mutatói; név/Neptun javítás, elírt rekord összevonása |
 | `catalogadmin/admin.php` | Kurzusok, órák, jelenléti ívek (nyit/zár, kézi felvétel, IP-címek, törlés) |
-| `catalogadmin/migrate.php` | Átvétel a régi `csurgay_tintin.log` táblából (ismételhető) |
+| `catalogadmin/migrate.php` | Átvétel a régi `csurgay_tintin.log` táblából – megtörtént, a menüből kivéve, URL-en még elérhető |
 | `catalogadmin/install.php` | Táblák létrehozása (`catalog/schema.sql`) |
 
 A hallgatói oldalon nincs link az oktatói részre. Ha a szerveren a `catalog` mappa más nevet kap,
@@ -26,7 +26,7 @@ a `catalogadmin/boot.php` egyetlen sorát kell átírni.
 1. Tárhely-kezelőben: új adatbázis `csurgay_catalog` + felhasználó `csurgay_catalog` (minden jog).
 2. `catalog/config.php`: `DB_PASS` és `ADMIN_PIN` kitöltése.
 3. Mindkét mappa feltöltése egymás mellé, majd `…/catalogadmin/` (PIN) → `install.php` → *Táblák létrehozása*.
-4. `…/catalogadmin/migrate.php`: előnézet → teszt-napok kipipálása → *Migrálás indítása*.
+4. (Egyszeri, már megtörtént:) `…/catalogadmin/migrate.php` – átvétel a régi tintin adatbázisból.
 
 ## Migráció
 

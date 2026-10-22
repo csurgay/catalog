@@ -35,6 +35,16 @@ test($G, 'Ékezetek és emoji (utf8mb4) épen visszajönnek', function () {
     same($name, qv('SELECT name FROM student WHERE id = ?', [$sid]));
 });
 
+test($G, 'Minden tábla utf8mb4 karakterkészletű', function () {
+    if (!is_mysql()) skip('Csak MySQL-en értelmes');
+    $bad = [];
+    foreach (rows("SELECT TABLE_NAME, TABLE_COLLATION FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'") as $r)
+        if (stripos((string)$r['TABLE_COLLATION'], 'utf8mb4') !== 0) $bad[] = $r['TABLE_NAME'] . ' (' . $r['TABLE_COLLATION'] . ')';
+    check(!$bad, 'Nem utf8mb4: ' . implode(', ', $bad));
+    $def = (string)qv('SELECT @@character_set_database');
+    if (stripos($def, 'utf8mb4') !== 0) warn("Az adatbázis alapértelmezett karakterkészlete $def – az új táblákhoz mindig add meg: DEFAULT CHARSET=utf8mb4");
+});
+
 test($G, 'Az adatbázis és a PHP órája egyezik (időzóna)', function () {
     if (!is_mysql()) skip('Csak MySQL-en értelmes');
     $diff = abs(strtotime((string)qv('SELECT NOW()')) - time());
@@ -60,10 +70,4 @@ test($G, 'Kaszkád törlés: kurzus → órák → jelenlétek', function () {
 test($G, 'Beállítások: admin PIN nem az alapértelmezett', function () {
     if (ADMIN_PIN === '1234' || ADMIN_PIN === '') warn('Az ADMIN_PIN még az alapértelmezett – cseréld le a config.php-ban');
     check(strlen(ADMIN_PIN) >= 4, 'Túl rövid PIN');
-});
-
-test($G, 'A régi tintin adatbázis elérhető (migrációhoz)', function () {
-    try { $cols = src_columns(src_db(), 'log'); }
-    catch (Throwable $e) { warn('Nem érhető el: ' . $e->getMessage() . ' – a migráció után ez rendben van'); }
-    check(isset($cols['username'], $cols['key1'], $cols['eventname']), 'A log tábla szerkezete nem a várt');
 });
