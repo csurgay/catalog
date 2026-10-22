@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/boot.php';
 require_admin();
 try { qv('SELECT 1 FROM course LIMIT 1'); } catch (Exception $e) { redirect('install.php'); }
 page_head('Statisztika', 'stats');

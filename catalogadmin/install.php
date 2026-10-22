@@ -1,13 +1,13 @@
 <?php
 // Egyszeri telepítés: létrehozza a táblákat a csurgay_catalog adatbázisban (ismételten is futtatható).
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/boot.php';
 require_admin();
 
 $msgs = []; $err = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
     try {
-        $sql = file_get_contents(__DIR__ . '/schema.sql');
+        $sql = file_get_contents(dirname(__DIR__) . '/' . CATALOG_DIRNAME . '/schema.sql');
         $sql = preg_replace('/^\s*--.*$/m', '', $sql);
         foreach (array_filter(array_map('trim', explode(';', $sql))) as $stmt) {
             db()->exec($stmt);

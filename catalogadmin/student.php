@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/boot.php';
 require_admin();
 $id = (int)($_GET['id'] ?? 0);
 $s = q1('SELECT * FROM student WHERE id = ?', [$id]);

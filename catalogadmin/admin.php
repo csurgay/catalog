@@ -1,6 +1,6 @@
 <?php
 // Kurzusok, órák, jelenléti ívek kezelése
-require_once __DIR__ . '/checkin_lib.php';
+require_once __DIR__ . '/boot.php';
 require_admin();
 try { qv('SELECT 1 FROM course LIMIT 1'); } catch (Exception $e) { redirect('install.php'); }
 

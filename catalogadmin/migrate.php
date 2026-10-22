@@ -6,7 +6,7 @@
 // Az időpontot az INSERT nem adja meg, tehát a log táblában van egy alapértelmezett
 // (CURRENT_TIMESTAMP) időbélyeg-oszlop – ennek nevét a script futáskor deríti ki.
 // Ismételten futtatható: a már feldolgozott sorokat az import_raw tábla alapján kihagyja.
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/boot.php';
 require_admin();
 set_time_limit(300);
 
