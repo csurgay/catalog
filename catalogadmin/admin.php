@@ -9,63 +9,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
     $a = $_POST['a'] ?? '';
     $id = (int)($_POST['id'] ?? 0);
-    switch ($a) {
-        case 'settings':
-            set_setting('active_course_id', (int)$_POST['active_course_id']);
-            set_setting('checkin_mode', $_POST['checkin_mode'] === 'manual' ? 'manual' : 'auto');
-            flash('Beállítások mentve.');
-            break;
-        case 'add_course':
-            $n = trim($_POST['name'] ?? '');
-            if ($n === '') { flash('A kurzus neve kötelező.', 'err'); break; }
-            q('INSERT INTO course (code, name, semester) VALUES (?, ?, ?)', [trim($_POST['code']), $n, trim($_POST['semester'])]);
-            $back = 'admin.php?course=' . db()->lastInsertId();
-            flash('Kurzus létrehozva.');
-            break;
-        case 'edit_course':
-            q('UPDATE course SET code = ?, name = ?, semester = ? WHERE id = ?', [trim($_POST['code']), trim($_POST['name']), trim($_POST['semester']), $id]);
-            flash('Kurzus mentve.');
-            break;
-        case 'delete_course':
-            if (($_POST['confirm'] ?? '') !== 'TÖRÖL') { flash('A törléshez írd be: TÖRÖL', 'err'); break; }
-            q('DELETE FROM course WHERE id = ?', [$id]);
-            $back = 'admin.php';
-            flash('Kurzus és óráinak jelenlétei törölve.');
-            break;
-        case 'add_lecture':
-            $d = $_POST['date'] ?? '';
-            if (!preg_match('/^\d{4}-\d\d-\d\d$/', $d)) { flash('Hibás dátum.', 'err'); break; }
-            try {
-                q('INSERT INTO lecture (course_id, lecture_date, title, is_open) VALUES (?, ?, ?, ?)', [(int)$_POST['course_id'], $d, trim($_POST['title'] ?? ''), $d === date('Y-m-d') ? 1 : 0]);
+    try {
+        switch ($a) {
+            case 'settings':
+                settings_save($_POST['active_course_id'] ?? 0, $_POST['checkin_mode'] ?? 'auto');
+                flash('Beállítások mentve.');
+                break;
+            case 'add_course':
+                $back = 'admin.php?course=' . course_add($_POST['code'] ?? '', $_POST['name'] ?? '', $_POST['semester'] ?? '');
+                flash('Kurzus létrehozva.');
+                break;
+            case 'edit_course':
+                course_edit($id, $_POST['code'] ?? '', $_POST['name'] ?? '', $_POST['semester'] ?? '');
+                flash('Kurzus mentve.');
+                break;
+            case 'delete_course':
+                course_delete($id, $_POST['confirm'] ?? '');
+                $back = 'admin.php';
+                flash('Kurzus és óráinak jelenlétei törölve.');
+                break;
+            case 'add_lecture':
+                lecture_add((int)($_POST['course_id'] ?? 0), $_POST['date'] ?? '', $_POST['title'] ?? '');
                 flash('Óra felvéve.');
-            } catch (PDOException $e) { flash('Erre a napra már van óra ebben a kurzusban.', 'err'); }
-            break;
-        case 'edit_lecture':
-            try {
-                q('UPDATE lecture SET title = ?, lecture_date = ? WHERE id = ?', [trim($_POST['title'] ?? ''), $_POST['date'], $id]);
+                break;
+            case 'edit_lecture':
+                lecture_edit($id, $_POST['date'] ?? '', $_POST['title'] ?? '');
                 flash('Óra mentve.');
-            } catch (PDOException $e) { flash('Erre a napra már van óra.', 'err'); }
-            break;
-        case 'toggle_lecture':
-            q('UPDATE lecture SET is_open = 1 - is_open WHERE id = ?', [$id]);
-            break;
-        case 'delete_lecture':
-            $cid = qv('SELECT course_id FROM lecture WHERE id = ?', [$id]);
-            q('DELETE FROM lecture WHERE id = ?', [$id]);
-            $back = 'admin.php?course=' . $cid;
-            flash('Óra törölve.');
-            break;
-        case 'add_att':
-            $res = do_checkin((string)$id, $_POST['name'] ?? '', $_POST['neptun'] ?? '', 'manual');
-            flash($res[0] ? ($res[1] === 'Rögzítve.' ? 'Hozzáadva: ' . $res[2]['name'] : $res[1]) : $res[1], $res[0] ? 'ok' : 'err');
-            break;
-        case 'mark':
-            try { q('INSERT INTO attendance (lecture_id, student_id, checked_at, source) VALUES (?, ?, ?, ?)', [$id, (int)$_POST['sid'], now(), 'manual']); }
-            catch (PDOException $e) {}
-            break;
-        case 'del_att':
-            q('DELETE FROM attendance WHERE id = ?', [(int)$_POST['att']]);
-            break;
+                break;
+            case 'toggle_lecture':
+                lecture_toggle($id);
+                break;
+            case 'delete_lecture':
+                $back = 'admin.php?course=' . lecture_delete($id);
+                flash('Óra törölve.');
+                break;
+            case 'add_att':
+                $res = do_checkin((string)$id, $_POST['name'] ?? '', $_POST['neptun'] ?? '', 'manual');
+                flash($res[0] ? ($res[1] === 'Rögzítve.' ? 'Hozzáadva: ' . $res[2]['name'] : $res[1]) : $res[1], $res[0] ? 'ok' : 'err');
+                break;
+            case 'mark':
+                att_mark($id, (int)($_POST['sid'] ?? 0));
+                break;
+            case 'del_att':
+                att_delete((int)($_POST['att'] ?? 0));
+                break;
+        }
+    } catch (UserError $e) {
+        flash($e->getMessage(), 'err');
     }
     redirect($back);
 }
@@ -76,14 +66,9 @@ $mode = setting('checkin_mode', 'auto');
 
 // ---------- Egy óra jelenléti íve ----------
 if (isset($_GET['lecture'])) {
-    $lec = q1('SELECT l.*, c.name AS course_name FROM lecture l JOIN course c ON c.id = l.course_id WHERE l.id = ?', [(int)$_GET['lecture']]);
-    if (!$lec) redirect('admin.php');
-    $att = q('SELECT a.*, s.name, s.neptun FROM attendance a JOIN student s ON s.id = a.student_id WHERE a.lecture_id = ? ORDER BY a.checked_at', [$lec['id']])->fetchAll();
-    $ipCount = array_count_values(array_filter(array_column($att, 'ip')));
-    $absent = q('SELECT s.id, s.name, s.neptun, COUNT(*) AS n FROM student s
-                 JOIN attendance a ON a.student_id = s.id JOIN lecture l ON l.id = a.lecture_id
-                 WHERE l.course_id = ? AND s.id NOT IN (SELECT student_id FROM attendance WHERE lecture_id = ?)
-                 GROUP BY s.id, s.name, s.neptun ORDER BY n DESC, s.name', [$lec['course_id'], $lec['id']])->fetchAll();
+    $sheet = lecture_sheet((int)$_GET['lecture']);
+    if (!$sheet) redirect('admin.php');
+    ['lecture' => $lec, 'att' => $att, 'absent' => $absent, 'ipCount' => $ipCount] = $sheet;
     page_head('Jelenléti ív ' . $lec['lecture_date'], 'admin');
     ?>
     <p class="crumbs"><a href="admin.php?course=<?= (int)$lec['course_id'] ?>">← <?= h($lec['course_name']) ?></a></p>

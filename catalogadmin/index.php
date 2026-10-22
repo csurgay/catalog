@@ -4,9 +4,7 @@ require_once __DIR__ . '/boot.php';
 
 if (isset($_GET['logout'])) { unset($_SESSION['catalog_admin']); redirect('index.php'); }
 
-$next = $_GET['next'] ?? $_POST['next'] ?? 'stats.php';
-// csak a catalogadmin mappán belüli oldalra engedünk tovább (pl. stats.php, admin.php?lecture=3)
-if (!preg_match('~^[a-z_]+\.php(\?[\w=&%.-]*)?$~', $next)) $next = 'stats.php';
+$next = safe_next($_GET['next'] ?? $_POST['next'] ?? 'stats.php');
 
 if (is_admin()) redirect($next);
 

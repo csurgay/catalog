@@ -46,3 +46,29 @@ A feldolgozott sorok az `import_raw` táblába kerülnek, így újrafuttatáskor
 Arány, aktív arány (első megjelenés óta), utolsó 4 óra / trend, leghosszabb és aktuális sorozat,
 egymás utáni hiányzás, érkezés az óra mediánjához képest, visszatérési arány, státusz
 (Rendszeres / Ingadozó / Kockázatos / Lemorzsolódott / Új). Részletek a statisztika oldal alján.
+
+## Autotest
+
+`catalogadmin/autotest.php` (menü: **Autotest**) egy gombnyomásra lefuttatja az összes tesztet:
+
+* **PHP-tesztek** (`catalogadmin/tests/t*.php`): környezet és séma, normalizálás, hallgatói bejelentkezés,
+  kurzusok/órák, jelenléti ív, hallgatók, migráció, API, belépés és biztonság, élő oldalak HTTP-n.
+  Az adatbázis-tesztek **egy tranzakcióban futnak, amit a végén visszagörget** – az éles adatok nem változnak
+  (ezt a futás végén külön teszt ellenőrzi). Minden teszt saját SAVEPOINT-ban fut, egymástól független.
+  A migrációs tesztek ideiglenes táblát használnak, a valódi tintin adatbázist nem érintik.
+* **Böngészős tesztek** (`catalogadmin/assets/autotest.js`): a statisztika-számítások (`stats.js`) és a grafikonok.
+
+**Minden új funkcióhoz tartozik teszt.** Új PHP-teszt:
+
+```php
+// catalogadmin/tests/t45_valami.php
+test('Csoport', 'Mit ellenőriz', function () {
+    $c = fx_course(); $l = fx_lecture($c, day(-1));      // fixture-ök: tests/_framework.php
+    same(1, lecture_toggle($l));                          // check(), same(), contains(), throws(), warn(), skip()
+});
+```
+
+Új böngészős teszt: `jsTest('Csoport', 'Mit ellenőriz', () => { ... })` az `autotest.js` JS_TESTS részében.
+A tesztelhető logika a `catalogadmin/lib.php`-ban (oktatói műveletek, migráció, API) és a
+`catalog/checkin_lib.php`-ban (bejelentkezés) van; az oldalak csak ezeket hívják.
+Tilos a tesztekben: `ALTER`/`CREATE`/`DROP TABLE` nem ideiglenes táblán – MySQL-en ez lezárná a teszt-tranzakciót.
