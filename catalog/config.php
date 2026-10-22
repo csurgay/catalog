@@ -6,7 +6,7 @@ if (is_file(__DIR__ . '/config.local.php')) require __DIR__ . '/config.local.php
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'csurgay_catalog');
 define('DB_USER', 'csurgay_catalog');
-define('DB_PASS', '');            // <-- TÖLTSD KI
+define('DB_PASS', 'Catalog-nem1szeru11');            // <-- TÖLTSD KI
 
 // ---- Forrás adatbázis (régi, csak a migrációhoz kell) ----
 define('SRC_HOST', 'localhost');
@@ -15,7 +15,7 @@ define('SRC_USER', 'csurgay_tintin');
 define('SRC_PASS', 'Tintin11');
 
 // ---- Admin / statisztika PIN ----
-define('ADMIN_PIN', '1234');      // <-- CSERÉLD LE
+define('ADMIN_PIN', '7432');      // <-- CSERÉLD LE
 
 define('APP_TZ', 'Europe/Budapest');
 define('APP_TITLE', 'Labor katalógus');

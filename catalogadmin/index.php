@@ -1,8 +1,15 @@
 <?php
-require_once __DIR__ . '/db.php';
+// Oktatói belépés (PIN) – a catalogadmin kezdőoldala.
+require_once __DIR__ . '/boot.php';
+
 if (isset($_GET['logout'])) { unset($_SESSION['catalog_admin']); redirect('index.php'); }
+
 $next = $_GET['next'] ?? $_POST['next'] ?? 'stats.php';
-if (!preg_match('~^[\w./?=&%-]*$~', $next) || strpos($next, '//') !== false) $next = 'stats.php';
+// csak a catalogadmin mappán belüli oldalra engedünk tovább (pl. stats.php, admin.php?lecture=3)
+if (!preg_match('~^[a-z_]+\.php(\?[\w=&%.-]*)?$~', $next)) $next = 'stats.php';
+
+if (is_admin()) redirect($next);
+
 $err = false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (hash_equals(ADMIN_PIN, (string)($_POST['pin'] ?? ''))) {
@@ -12,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $err = true; usleep(600000);
 }
-page_head('Belépés', '', 'center-page');
+page_head('Oktatói belépés', '', 'center-page');
 ?>
 <form method="post" class="card narrow login">
   <div class="logo big"></div>
@@ -21,6 +28,5 @@ page_head('Belépés', '', 'center-page');
   <input class="pin" type="password" name="pin" inputmode="numeric" autocomplete="current-password" placeholder="PIN" autofocus>
   <?php if ($err): ?><p class="err-text">Hibás PIN.</p><?php endif; ?>
   <button class="btn block">Belépés</button>
-  <p class="muted small"><a href="index.php">← Hallgatói jelenléti ív</a></p>
 </form>
 <?php page_foot();

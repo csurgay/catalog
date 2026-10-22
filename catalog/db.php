@@ -1,6 +1,7 @@
 <?php
 // Közös segédfüggvények: DB kapcsolat, admin session, layout
 require_once __DIR__ . '/config.php';
+define('CATALOG_DIRNAME', basename(__DIR__));
 date_default_timezone_set(APP_TZ);
 ini_set('default_charset', 'UTF-8');
 if (session_status() === PHP_SESSION_NONE) session_start();
@@ -62,7 +63,9 @@ function normalize_name($s) {
 function is_admin() { return !empty($_SESSION['catalog_admin']); }
 function require_admin() {
     if (!is_admin()) {
-        header('Location: login.php?next=' . urlencode($_SERVER['REQUEST_URI'] ?? 'stats.php'));
+        $next = basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: 'stats.php');
+        $qs = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_QUERY);
+        header('Location: index.php?next=' . urlencode($next . ($qs ? '?' . $qs : '')));
         exit;
     }
 }
@@ -90,7 +93,15 @@ function hu_date($ymd, $withDay = true) {
 }
 
 // ---- Layout ----
+// A hallgatói app (catalog) mappájának relatív útja az épp futó oldalhoz képest:
+// a catalog-ból '', a mellette lévő catalogadmin-ból '../catalog/'.
+function app_base() {
+    $here = realpath(dirname($_SERVER['SCRIPT_FILENAME'] ?? __FILE__));
+    return $here === realpath(__DIR__) ? '' : '../' . basename(__DIR__) . '/';
+}
+
 function page_head($title, $active = '', $bodyClass = '') {
+    $base = app_base();
     $nav = [
         'stats' => ['stats.php', 'Statisztika'],
         'admin' => ['admin.php', 'Órák'],
@@ -102,23 +113,23 @@ function page_head($title, $active = '', $bodyClass = '') {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= h($title) ?> · <?= h(APP_TITLE) ?></title>
-<link rel="stylesheet" href="assets/style.css?v=1">
+<link rel="stylesheet" href="<?= h($base) ?>assets/style.css?v=2">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232a78d6'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 </head>
 <body class="<?= h($bodyClass) ?>">
-<?php if (is_admin()): ?>
+<?php if (is_admin() && $base !== ''): /* csak az oktatói (catalogadmin) oldalakon */ ?>
 <header class="topbar">
   <a class="brand" href="stats.php"><span class="logo"></span><?= h(APP_TITLE) ?></a>
   <nav>
     <?php foreach ($nav as $k => [$href, $label]): ?>
       <a href="<?= $href ?>" class="<?= $k === $active ? 'on' : '' ?>"><?= h($label) ?></a>
     <?php endforeach; ?>
-    <a href="index.php" target="_blank" title="Hallgatói bejelentkező oldal">Check-in ↗</a>
-    <a href="login.php?logout=1" class="muted">Kilépés</a>
+    <a href="<?= h($base) ?>" target="_blank" title="Hallgatói bejelentkező oldal">Check-in ↗</a>
+    <a href="index.php?logout=1" class="muted">Kilépés</a>
   </nav>
 </header>
 <?php endif; ?>
-<main class="<?= is_admin() ? 'wrap' : '' ?>">
+<main class="<?= is_admin() && $base !== '' ? 'wrap' : '' ?>">
 <?= flash() ?>
 <?php
 }
