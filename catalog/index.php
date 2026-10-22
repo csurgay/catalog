@@ -31,7 +31,7 @@ page_head('Jelenléti ív', '', 'center-page checkin');
 <?php if (!$installed): ?>
   <div class="logo big"></div>
   <h1><?= h(APP_TITLE) ?></h1>
-  <p class="muted">Az alkalmazás még nincs telepítve. <a href="../catalogadmin/install.php">Telepítés →</a></p>
+  <p class="muted">Az alkalmazás még nincs telepítve.</p>
 
 <?php elseif ($done): ?>
   <div class="done-mark <?= $done['again'] ? 'again' : '' ?>" aria-hidden="true">

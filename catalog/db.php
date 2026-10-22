@@ -33,6 +33,27 @@ function q($sql, $params = []) {
     $st->execute($params);
     return $st;
 }
+/**
+ * Tranzakció, egymásba ágyazható: ha már fut egy (pl. az autotest külső tranzakciója),
+ * SAVEPOINT-ot használ, így a belső hiba csak a saját részét görgeti vissza.
+ */
+function tx(callable $fn) {
+    static $depth = 0;
+    $db = db();
+    $outer = !$db->inTransaction();
+    $sp = 'sp_' . (++$depth);
+    $outer ? $db->beginTransaction() : $db->exec("SAVEPOINT $sp");
+    try {
+        $r = $fn();
+        $outer ? $db->commit() : $db->exec("RELEASE SAVEPOINT $sp");
+        $depth--;
+        return $r;
+    } catch (Throwable $e) {
+        $outer ? $db->rollBack() : $db->exec("ROLLBACK TO SAVEPOINT $sp");
+        $depth--;
+        throw $e;
+    }
+}
 function q1($sql, $params = []) { $r = q($sql, $params)->fetch(); return $r === false ? null : $r; }
 function qv($sql, $params = []) { $v = q($sql, $params)->fetchColumn(); return $v === false ? null : $v; }
 
@@ -106,6 +127,7 @@ function page_head($title, $active = '', $bodyClass = '') {
         'stats' => ['stats.php', 'Statisztika'],
         'admin' => ['admin.php', 'Órák'],
         'migrate' => ['migrate.php', 'Migráció'],
+        'autotest' => ['autotest.php', 'Autotest'],
     ];
     ?><!doctype html>
 <html lang="hu">
@@ -113,7 +135,7 @@ function page_head($title, $active = '', $bodyClass = '') {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= h($title) ?> · <?= h(APP_TITLE) ?></title>
-<link rel="stylesheet" href="<?= h($base) ?>assets/style.css?v=2">
+<link rel="stylesheet" href="<?= h($base) ?>assets/style.css?v=3">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232a78d6'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 </head>
 <body class="<?= h($bodyClass) ?>">

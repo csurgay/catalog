@@ -7,33 +7,23 @@ if (!$s) { flash('Nincs ilyen hallgató.', 'err'); redirect('stats.php'); }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
-    switch ($_POST['a'] ?? '') {
-        case 'save':
-            $nep = normalize_neptun($_POST['neptun']);
-            if (!valid_neptun($nep)) { flash('Érvénytelen Neptun-kód.', 'err'); break; }
-            $other = qv('SELECT id FROM student WHERE neptun = ? AND id <> ?', [$nep, $id]);
-            if ($other) { flash("Ez a Neptun-kód már egy másik hallgatóé – használd az összevonást.", 'err'); break; }
-            q('UPDATE student SET name = ?, neptun = ?, note = ? WHERE id = ?', [normalize_name($_POST['name']), $nep, trim($_POST['note']), $id]);
-            flash('Mentve.');
-            break;
-        case 'merge':
-            // a megadott Neptunú (elírt) rekord jelenléteit ide költözteti, majd azt törli
-            $src = q1('SELECT * FROM student WHERE neptun = ? AND id <> ?', [normalize_neptun($_POST['other']), $id]);
-            if (!$src) { flash('Nincs ilyen Neptun-kódú másik hallgató.', 'err'); break; }
-            $db = db(); $db->beginTransaction();
-            $moved = 0;
-            foreach (q('SELECT id, lecture_id FROM attendance WHERE student_id = ?', [$src['id']])->fetchAll() as $a) {
-                if (qv('SELECT id FROM attendance WHERE student_id = ? AND lecture_id = ?', [$id, $a['lecture_id']])) continue;
-                q('UPDATE attendance SET student_id = ? WHERE id = ?', [$id, $a['id']]); $moved++;
-            }
-            q('DELETE FROM student WHERE id = ?', [$src['id']]);
-            $db->commit();
-            flash("Összevonva: {$src['neptun']} ({$src['name']}) → {$moved} jelenlét átkerült.");
-            break;
-        case 'delete':
-            q('DELETE FROM student WHERE id = ?', [$id]);
-            flash('Hallgató és jelenlétei törölve.');
-            redirect('stats.php');
+    try {
+        switch ($_POST['a'] ?? '') {
+            case 'save':
+                student_save($id, $_POST['name'] ?? '', $_POST['neptun'] ?? '', $_POST['note'] ?? '');
+                flash('Mentve.');
+                break;
+            case 'merge':
+                [$src, $moved] = student_merge($id, $_POST['other'] ?? '');
+                flash("Összevonva: {$src['neptun']} ({$src['name']}) → {$moved} jelenlét átkerült.");
+                break;
+            case 'delete':
+                student_delete($id);
+                flash('Hallgató és jelenlétei törölve.');
+                redirect('stats.php');
+        }
+    } catch (UserError $e) {
+        flash($e->getMessage(), 'err');
     }
     redirect('student.php?id=' . $id);
 }

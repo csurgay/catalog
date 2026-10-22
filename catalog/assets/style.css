@@ -287,3 +287,28 @@ body.center-page main { width: 100%; display: flex; flex-direction: column; alig
   main.wrap { padding: 1rem 1rem 3rem; }
   .table-tools input[type=search] { min-width: 0; flex: 1 1 100%; }
 }
+
+/* ---------- autotest ---------- */
+.at-summary { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1.5rem; border-left: 5px solid var(--good); }
+.at-summary.bad { border-left-color: var(--critical); }
+.at-big { display: flex; align-items: center; gap: .8rem; }
+.at-big b { display: block; font-size: 1.35rem; }
+.at-big small { color: var(--ink-2); }
+.at-big .at-ico { width: 42px; height: 42px; font-size: 1.4rem; }
+.at-meta { margin-left: auto; }
+.at-only { font-size: .88rem; color: var(--ink-2); display: flex; gap: .4rem; align-items: center; width: 100%; }
+.at-group .card-head { margin-bottom: .3rem; }
+.at-count { font-weight: 700; font-variant-numeric: tabular-nums; padding: .1rem .6rem; border-radius: 99px; background: var(--surface-2); }
+.at-count.pass { color: var(--good-ink); } .at-count.fail { color: var(--critical-ink); } .at-count.warn { color: var(--warn-ink); }
+.at-list { list-style: none; margin: 0; padding: 0; }
+.at-list li { display: grid; grid-template-columns: 26px 1fr auto; gap: .65rem; align-items: start; padding: .45rem .2rem; border-top: 1px solid var(--grid); }
+.at-list li:first-child { border-top: 0; }
+.at-ico { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; color: #fff; font-weight: 700; font-size: .8rem; flex: none; }
+.at-ico.pass { background: var(--good); } .at-ico.fail { background: var(--critical); }
+.at-ico.warn { background: var(--warn); color: #3a2a00; } .at-ico.skip { background: var(--axis); color: var(--ink-2); }
+.at-name { min-width: 0; }
+.at-msg { display: block; font-family: var(--mono); font-size: .8rem; margin-top: .2rem; color: var(--ink-2); overflow-wrap: anywhere; }
+.at-fail .at-msg { color: var(--critical-ink); }
+.at-ms { color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+body.at-onlybad .at-list li.at-pass, body.at-onlybad .at-list li.at-skip { display: none; }
+body.at-onlybad .at-group:not(:has(.at-fail, .at-warn)) { display: none; }

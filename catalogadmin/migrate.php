@@ -10,146 +10,26 @@ require_once __DIR__ . '/boot.php';
 require_admin();
 set_time_limit(300);
 
-function src_db() {
-    static $p = null;
-    if ($p === null) $p = pdo_connect(SRC_DSN, SRC_HOST, SRC_NAME, SRC_USER, SRC_PASS);
-    return $p;
-}
-function src_columns(PDO $p) {
-    $cols = [];
-    if ($p->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
-        foreach ($p->query('PRAGMA table_info(log)') as $r) $cols[$r['name']] = strtolower($r['type']);
-    } else {
-        foreach ($p->query('SHOW COLUMNS FROM `log`') as $r) $cols[$r['Field']] = strtolower($r['Type']);
-    }
-    return $cols;
-}
-function guess_ts_col($cols) {
-    foreach ($cols as $c => $t) if (preg_match('/timestamp|datetime/', $t)) return $c;
-    foreach ($cols as $c => $t) if (preg_match('/time|date|created|^ts$|when/i', $c)) return $c;
-    return null;
-}
-
-$error = null; $result = null;
+$error = null;
 try {
     qv('SELECT COUNT(*) FROM course');
 } catch (Exception $e) {
     redirect('install.php');
 }
 
+$event = $_REQUEST['event'] ?? 'neptun';
 try {
-    $src  = src_db();
-    $cols = src_columns($src);
-    if (!$cols) throw new Exception('A forrás adatbázisban nincs „log” tábla.');
-    foreach (['username', 'eventname', 'key1'] as $need)
-        if (!isset($cols[$need])) throw new Exception("A log táblából hiányzik a(z) „{$need}” oszlop. Oszlopok: " . implode(', ', array_keys($cols)));
+    $an = migrate_analyze(src_db(), 'log', $event, $_REQUEST['ts'] ?? null);
+    ['cols' => $cols, 'tsCol' => $tsCol, 'idCol' => $idCol, 'eventCounts' => $eventCounts, 'already' => $already,
+     'items' => $items, 'invalid' => $invalid, 'dates' => $dates, 'conflicts' => $conflicts, 'distinctNeptun' => $distinctNeptun] = $an;
+    $rowsN = $an['rows'];
 
-    $tsCol = $_REQUEST['ts'] ?? guess_ts_col($cols);
-    if ($tsCol !== null && !isset($cols[$tsCol])) $tsCol = null;
-    $idCol = isset($cols['id']) ? 'id' : null;
-    $event = $_REQUEST['event'] ?? 'neptun';
-
-    $eventCounts = $src->query('SELECT eventname, COUNT(*) AS n FROM `log` GROUP BY eventname ORDER BY n DESC')->fetchAll();
-
-    $rows = [];
-    if ($tsCol) {
-        $st = $src->prepare('SELECT ' . ($idCol ? "`$idCol` AS _id, " : '') . "`username`, `key1`, `$tsCol` AS _ts FROM `log` WHERE eventname = ? ORDER BY `$tsCol`" . ($idCol ? ", `$idCol`" : ''));
-        $st->execute([$event]);
-        $rows = $st->fetchAll();
-    }
-
-    // már feldolgozott kulcsok
-    $done = [];
-    foreach (q('SELECT legacy_key FROM import_raw') as $r) $done[$r['legacy_key']] = true;
-
-    // ---- elemzés ----
-    $items = []; $dates = []; $names = []; $invalid = []; $already = 0;
-    foreach ($rows as $r) {
-        $ts  = $r['_ts'] ? date('Y-m-d H:i:s', strtotime($r['_ts'])) : null;
-        $key = $idCol ? 'id:' . $r['_id'] : 'h:' . sha1($r['username'] . '|' . $r['key1'] . '|' . $r['_ts']);
-        $nep = normalize_neptun($r['key1']);
-        $nam = normalize_name($r['username']);
-        $it  = ['key' => $key, 'raw_name' => $r['username'], 'raw_key' => $r['key1'], 'ts' => $ts,
-                'date' => $ts ? substr($ts, 0, 10) : null, 'neptun' => $nep, 'name' => $nam];
-        if (isset($done[$key])) { $already++; continue; }
-        if (!valid_neptun($nep) || !$ts) { $invalid[] = $it; continue; }
-        $items[] = $it;
-        $dates[$it['date']][$nep] = true;
-        if ($nam !== '') {
-            $names[$nep][$nam]['n'] = ($names[$nep][$nam]['n'] ?? 0) + 1;
-            $names[$nep][$nam]['last'] = $ts;
-        }
-    }
-    ksort($dates);
-    $conflicts = array_filter($names, fn($v) => count($v) > 1);
-    $distinctNeptun = count(array_unique(array_column($items, 'neptun')));
-
-    // ---- végrehajtás ----
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['run'])) {
         check_csrf();
-        $selDates = array_flip($_POST['dates'] ?? []);
-        $courseId = (int)($_POST['course_id'] ?? 0);
-        $db = db();
-        $db->beginTransaction();
-        try {
-            if ($courseId === 0) {
-                $cn = trim($_POST['new_course'] ?? '') ?: 'Labor';
-                q('INSERT INTO course (code, name, semester) VALUES (?, ?, ?)', [trim($_POST['new_code'] ?? ''), $cn, trim($_POST['new_semester'] ?? '')]);
-                $courseId = (int)$db->lastInsertId();
-                if (!setting('active_course_id')) set_setting('active_course_id', $courseId);
-            }
-            $today = date('Y-m-d');
-            $lectureIds = []; $studentIds = [];
-            $res = ['imported' => 0, 'duplicate' => 0, 'lectures_new' => 0, 'students_new' => 0, 'skipped_dates' => 0];
-
-            foreach ($items as $it) {
-                if (!isset($selDates[$it['date']])) { $res['skipped_dates']++; continue; }
-                $d = $it['date'];
-                if (!isset($lectureIds[$d])) {
-                    $lid = qv('SELECT id FROM lecture WHERE course_id = ? AND lecture_date = ?', [$courseId, $d]);
-                    if (!$lid) {
-                        q('INSERT INTO lecture (course_id, lecture_date, title, is_open) VALUES (?, ?, ?, ?)', [$courseId, $d, '', $d === $today ? 1 : 0]);
-                        $lid = $db->lastInsertId(); $res['lectures_new']++;
-                    }
-                    $lectureIds[$d] = (int)$lid;
-                }
-                $nep = $it['neptun'];
-                if (!isset($studentIds[$nep])) {
-                    // leggyakoribb névalak (döntetlennél a legutóbbi)
-                    $best = '';
-                    if (!empty($names[$nep])) {
-                        $cand = $names[$nep];
-                        uasort($cand, fn($a, $b) => [$b['n'], $b['last']] <=> [$a['n'], $a['last']]);
-                        $best = array_key_first($cand);
-                    }
-                    $s = q1('SELECT id, name FROM student WHERE neptun = ?', [$nep]);
-                    if (!$s) {
-                        q('INSERT INTO student (neptun, name) VALUES (?, ?)', [$nep, $best]);
-                        $studentIds[$nep] = (int)$db->lastInsertId(); $res['students_new']++;
-                    } else {
-                        $studentIds[$nep] = (int)$s['id'];
-                        if ($s['name'] === '' && $best !== '') q('UPDATE student SET name = ? WHERE id = ?', [$best, $s['id']]);
-                    }
-                }
-                $lid = $lectureIds[$d]; $sid = $studentIds[$nep];
-                $aid = qv('SELECT id FROM attendance WHERE lecture_id = ? AND student_id = ?', [$lid, $sid]);
-                if ($aid) {
-                    $status = 'duplicate'; $res['duplicate']++;
-                } else {
-                    q('INSERT INTO attendance (lecture_id, student_id, checked_at, source, name_given) VALUES (?, ?, ?, ?, ?)',
-                      [$lid, $sid, $it['ts'], 'tintin', mb_substr($it['raw_name'], 0, 200)]);
-                    $aid = $db->lastInsertId(); $status = 'imported'; $res['imported']++;
-                }
-                q('INSERT INTO import_raw (legacy_key, username, key1, logged_at, status, attendance_id) VALUES (?, ?, ?, ?, ?, ?)',
-                  [$it['key'], mb_substr($it['raw_name'], 0, 255), mb_substr($it['raw_key'], 0, 255), $it['ts'], $status, $aid]);
-            }
-            $db->commit();
-            flash("Kész: {$res['imported']} jelenlét átvéve, {$res['duplicate']} ismétlés összevonva, {$res['students_new']} új hallgató, {$res['lectures_new']} új óra.");
-            redirect('migrate.php?event=' . urlencode($event) . '&ts=' . urlencode($tsCol) . '&done=1');
-        } catch (Exception $e) {
-            $db->rollBack();
-            throw $e;
-        }
+        $res = migrate_run($an, $_POST['dates'] ?? [], (int)($_POST['course_id'] ?? 0),
+                           ['code' => $_POST['new_code'] ?? '', 'name' => $_POST['new_course'] ?? '', 'semester' => $_POST['new_semester'] ?? '']);
+        flash("Kész: {$res['imported']} jelenlét átvéve, {$res['duplicate']} ismétlés összevonva, {$res['students_new']} új hallgató, {$res['lectures_new']} új óra.");
+        redirect('migrate.php?event=' . urlencode($event) . '&ts=' . urlencode($tsCol) . '&done=1');
     }
 } catch (Exception $e) {
     $error = $e->getMessage();
@@ -196,7 +76,7 @@ page_head('Migráció', 'migrate');
 <section class="card">
   <h2>2. Előnézet</h2>
   <div class="kpis small">
-    <div class="kpi"><span>Log sorok (<?= h($event) ?>)</span><b><?= count($rows) ?></b></div>
+    <div class="kpi"><span>Log sorok (<?= h($event) ?>)</span><b><?= $rowsN ?></b></div>
     <div class="kpi"><span>Már átvéve</span><b><?= $already ?></b></div>
     <div class="kpi"><span>Átvehető</span><b><?= count($items) ?></b></div>
     <div class="kpi"><span>Hibás Neptun</span><b class="<?= $invalid ? 'warn-text' : '' ?>"><?= count($invalid) ?></b></div>
