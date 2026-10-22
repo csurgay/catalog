@@ -13,7 +13,7 @@ page_head('Statisztika', 'stats');
 </div>
 
 <p id="loading" class="muted">Betöltés…</p>
-<div id="empty" class="card" hidden><h2>Ebben a kurzusban/időszakban még nincs óra.</h2><p class="muted">Futtasd a <a href="migrate.php">migrációt</a>, vagy várd meg az első bejelentkezéseket.</p></div>
+<div id="empty" class="card" hidden><h2>Ebben a kurzusban/időszakban még nincs óra.</h2><p class="muted">Várd meg az első bejelentkezéseket, vagy válassz másik kurzust / időszakot.</p></div>
 
 <div id="dash" hidden>
   <section class="kpis" id="kpis"></section>

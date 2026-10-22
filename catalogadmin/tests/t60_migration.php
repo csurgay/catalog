@@ -33,7 +33,7 @@ test($G, 'Hiányzó kötelező oszlop érthető hibát ad', function () {
     // ALTER TABLE-t nem használunk: MySQL-en az lezárná (commitolná) a teszt tranzakcióját
     $t = 'autotest_log_bad';
     if (is_mysql()) {
-        db()->exec("CREATE TEMPORARY TABLE $t (id INT PRIMARY KEY, logtime TIMESTAMP NULL, username VARCHAR(50), eventname VARCHAR(20))");
+        db()->exec("CREATE TEMPORARY TABLE $t (id INT PRIMARY KEY, logtime TIMESTAMP NULL, username VARCHAR(50), eventname VARCHAR(20)) DEFAULT CHARSET=utf8mb4");
         on_cleanup(fn() => db()->exec("DROP TEMPORARY TABLE IF EXISTS $t"));
     } else {
         db()->exec("CREATE TEMP TABLE $t (id INTEGER PRIMARY KEY, logtime TIMESTAMP, username VARCHAR(50), eventname VARCHAR(20))");

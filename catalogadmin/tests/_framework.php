@@ -86,7 +86,7 @@ function fx_srclog(array $rows, $withTs = true) {
     $t = 'autotest_log';
     if (is_mysql()) {
         db()->exec("DROP TEMPORARY TABLE IF EXISTS $t");
-        db()->exec("CREATE TEMPORARY TABLE $t (id INT AUTO_INCREMENT PRIMARY KEY, " . ($withTs ? 'logtime TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP, ' : '') . "username VARCHAR(255), eventname VARCHAR(64), key1 VARCHAR(255), value1 VARCHAR(255))");
+        db()->exec("CREATE TEMPORARY TABLE $t (id INT AUTO_INCREMENT PRIMARY KEY, " . ($withTs ? 'logtime TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP, ' : '') . "username VARCHAR(255), eventname VARCHAR(64), key1 VARCHAR(255), value1 VARCHAR(255)) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_hungarian_ci");
         on_cleanup(fn() => db()->exec("DROP TEMPORARY TABLE IF EXISTS $t"));
     } else {
         db()->exec("DROP TABLE IF EXISTS temp.$t");

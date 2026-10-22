@@ -126,7 +126,6 @@ function page_head($title, $active = '', $bodyClass = '') {
     $nav = [
         'stats' => ['stats.php', 'Statisztika'],
         'admin' => ['admin.php', 'Órák'],
-        'migrate' => ['migrate.php', 'Migráció'],
         'autotest' => ['autotest.php', 'Autotest'],
     ];
     ?><!doctype html>

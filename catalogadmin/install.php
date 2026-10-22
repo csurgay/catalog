@@ -35,7 +35,7 @@ page_head('Telepítés', 'migrate');
   <?php if (count($tables) === 6): ?>
     <p class="ok-line">Minden tábla megvan:
       <?php foreach ($tables as $t => $n) echo '<span class="chip">' . h($t) . ' · ' . (int)$n . '</span> '; ?></p>
-    <p><a class="btn" href="migrate.php">Tovább a migrációhoz →</a></p>
+    <p><a class="btn" href="stats.php">Tovább a statisztikához →</a></p>
   <?php else: ?>
     <form method="post"><?= csrf_field() ?><button class="btn">Táblák létrehozása</button></form>
   <?php endif; ?>
